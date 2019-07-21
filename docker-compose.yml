@@ -1,0 +1,63 @@
+version: "3"
+services:
+  # None of our application code will be running here, so we can
+  # get the postgres image from docker hub and use it.
+  postgres:
+    image: "postgres:latest"
+  # Same for redis
+  redis:
+    image: "redis:latest"
+  api: # this used to be `server`, renamed into `api` because "server" is a reserved keyword in nginx config
+    depends_on:
+      - postgres
+      - redis
+    build:
+      # Note that here we're not supplying a path to the Dockerfile, just the file NAME
+      dockerfile: Dockerfile.dev
+      # This tells docker-compose to look for the specified Dockerfile in the `server` directory
+      context: ./server
+    volumes:
+      # inside the container don't try to overwrite this folder
+      - /app/node_modules
+      # anytime our application tries to access anything from the /app directory (note the server/Dockerfile.dev file)
+      # [except for node_modules] look into the local ./server folder.
+      - ./server:/app
+    environment:
+      # in docker-compose we just specify the name of the service that we want to reach.
+      - REDIS_HOST=redis
+      # this comes from the documentation for the redis image. We can configure it on the redis image, but there's no need for us to do that.
+      - REDIS_PORT=6379
+      # all variable values can be obtained from the postgres image documentation (except for PGHOST - this comes from this file)
+      - PGUSER=postgres
+      - PGHOST=postgres # name of the service
+      - PGDATABASE=postgres
+      - PGPASSWORD=postgres_password
+      - PGPORT=5432
+
+  client:
+    build:
+      dockerfile: Dockerfile.dev
+      context: ./client
+    volumes:
+      - /app/node_modules
+      - ./client:/app
+  worker:
+    build:
+      dockerfile: Dockerfile.dev
+      context: ./worker
+    volumes:
+      - /app/node_modules
+      - ./worker:/app
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+  nginx:
+    # this service is responsible for routing traffic, so we want it to be always up.
+    restart: always
+    build:
+      dockerfile: Dockerfile.dev
+      context: ./nginx
+    ports:
+      # this is the only place where we port map in the entire cluster.
+      - "3050:80"

@@ -1,0 +1,5 @@
+FROM nginx
+
+# we've added the file name in the second parameter to make sure that the existing
+# file in the image would be overwritten with our file.
+COPY ./default.conf /etc/nginx/conf.d/default.conf
