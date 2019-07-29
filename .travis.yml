@@ -1,0 +1,26 @@
+sudo: required
+services:
+  - docker
+
+before_install:
+  # This will build and locally tag an image that we can use to run the unit tests.
+  - docker build -t vkolmakov/react-test -f ./client/Dockerfile.dev ./client
+
+script:
+  - docker run -e CI=true vkolmakov/react-test npm run test -- --coverage
+
+after_success:
+  # Build an image for each service
+  - docker build -t vkolmakov/multi-container-client ./client
+  - docker build -t vkolmakov/multi-container-nginx ./nginx
+  - docker build -t vkolmakov/multi-container-server ./server
+  - docker build -t vkolmakov/multi-container-worker ./worker
+  # Now we will need to publish the images. In order to publish them,
+  # we will first need to login to DockerHub. DOCKER_ID and DOCKER_PASSWORD
+  # will be stored on Travis as environment variables
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_ID" --password-stdin
+  # Push the images to DockerHub
+  - docker push vkolmakov/multi-container-client
+  - docker push vkolmakov/multi-container-nginx
+  - docker push vkolmakov/multi-container-server
+  - docker push vkolmakov/multi-container-worker
